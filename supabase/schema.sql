@@ -1,0 +1,10 @@
+create extension if not exists pgcrypto;
+create table if not exists public.recipe_nodes(id uuid primary key default gen_random_uuid(),user_id uuid not null references auth.users(id) on delete cascade,parent_id uuid references public.recipe_nodes(id) on delete cascade,type text not null check(type in ('category','subcategory','recipe')),name text not null,position integer not null default 0,description text,source_url text,image_url text,ingredients jsonb,steps jsonb,prep_time text,cook_time text,total_time text,yield_text text,category_text text,cuisine text,created_at timestamptz not null default now(),updated_at timestamptz not null default now());
+alter table public.recipe_nodes enable row level security;
+create policy "read own recipe nodes" on public.recipe_nodes for select using(auth.uid()=user_id);
+create policy "insert own recipe nodes" on public.recipe_nodes for insert with check(auth.uid()=user_id);
+create policy "update own recipe nodes" on public.recipe_nodes for update using(auth.uid()=user_id) with check(auth.uid()=user_id);
+create policy "delete own recipe nodes" on public.recipe_nodes for delete using(auth.uid()=user_id);
+create or replace function public.create_recipe_book() returns trigger language plpgsql security definer set search_path=public as $$ begin insert into public.recipe_nodes(user_id,type,name,position) values(new.id,'category','ENTRANTES',0),(new.id,'category','ENSALADAS',1),(new.id,'category','RACIONES CON CARNE',2),(new.id,'category','RACIONES CON PESCADO',3),(new.id,'category','POSTRES',4),(new.id,'category','BEBIDAS',5); return new; end; $$;
+drop trigger if exists on_auth_user_created_recipe_book on auth.users;
+create trigger on_auth_user_created_recipe_book after insert on auth.users for each row execute procedure public.create_recipe_book();
